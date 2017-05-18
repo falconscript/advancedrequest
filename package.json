@@ -1,0 +1,15 @@
+{
+  "name": "advancedrequest",
+  "private": false,
+  "version": "1.0.3",
+  "description": "ES6 JS class for intervaled requests with retries and timeouts",
+  "keywords": ["advancedrequest", "advanced request", "http", "request",
+      "interval", "interval request", "api", "developer api", "rate", "limit", "rate limit", "rate limiting" ],
+  "dependencies": {
+    "request": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/falconscript/advancedrequest"
+  }
+}
