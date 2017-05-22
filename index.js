@@ -36,12 +36,13 @@ var lastRunHash = {
 
 class AdvancedRequest {
   constructor (args) {
-    this.url = args.url;
-    this.method = args.method || "GET";
-    this.postData = args.postData;
+    this.opts = args;
+    this.opts.method = args.method || "GET";
 
     // stringify if necessary
-    this.postData = (typeof(this.postData) == "object") ? JSON.stringify(this.postData) : this.postData;
+    if (typeof(this.opts.postData) == "object") {
+      this.opts.postData = JSON.stringify(this.opts.postData);
+    }
 
     this.name = args.name || "unnamed request";
     this.maxRetries = args.maxRetries || 10; // Pass in 0 for unlimited
@@ -80,12 +81,12 @@ class AdvancedRequest {
   }
 
   /**
-   * requestRetriesExhausted
+   * onRequestRetriesExhausted
    *
    * Occurs when the request has called .fail enough times to equal the 'this.maxRetries' count
    * You may want to override this function as your needs demand
    */
-  requestRetriesExhausted () {
+  onRequestRetriesExhausted () {
     console.log("[!] Max request retries exceeded for request named (", this.name, ")", ". Quitting process!");
     require('process').exit(0);
   }
@@ -100,8 +101,8 @@ class AdvancedRequest {
     this.numTriesSoFar++;
 
     console.log("[!]", additionalMsg || 'Req fail!',
-      "Status:", this.responseStatusCode, "url:", this.url, "name:", this.name,
-      "tries left:", this.maxRetries - this.numTriesSoFar, "options:", this.options);
+      "Status:", this.responseStatusCode, "url:", this.opts.url, "name:", this.name,
+      "tries left:", this.maxRetries - this.numTriesSoFar, "options:", this.reqOptions);
 
     if (this.numTriesSoFar >= this.maxRetries && this.maxRetries != 0) {
         return this.onRequestRetriesExhausted();
@@ -170,9 +171,7 @@ class AdvancedRequest {
       return this.sleepIntervalIfNecessary(() => {this.run.apply(this, arguments); });
     }
 
-    this.options = {
-      url: this.url,
-      method: this.method,
+    var extraOpts = {
       headers: this.requestHeaders,
       gzip: true,
       timeout: 60*1000, // number of ms to wait for response headers (1 min)
@@ -185,20 +184,28 @@ class AdvancedRequest {
     // If we're saving, we want an image file and therefore want the BUFFER
     // received, instead of the default "string". To maybe sha1 it, etc
     if (this.isBinaryRequest) {
-      this.options["encoding"] = null; // set to null to get binary and not string
+      extraOpts["encoding"] = null; // set to null to get binary and not string
     }
-    if (this.postData) {
+    if (this.opts.postData) {
       if (this.noMultipartHeader) {
-        this.options["form"] = this.postData;
+        extraOpts["form"] = this.opts.postData;
       } else {
-        this.options["multipart"] = [ {
+        extraOpts["multipart"] = [ {
           //'Content-Type': 'application/x-www-form-urlencoded',
-          body: (typeof(this.postData) == "string") ? this.postData : JSON.stringify(this.postData),
+          body: (typeof(this.opts.postData) == "string") ? this.opts.postData : JSON.stringify(this.opts.postData),
         } ];
       }
     }
 
-    var r = request(this.options, (error, response, body) => {
+    // Merge options to pass on additional options to request
+    this.reqOptions = Object.assign({}, this.opts, extraOpts);
+
+    // We're using 'form' or 'multipart' not the 'postData' key
+    if ('postData' in this.reqOptions) {
+      delete this.reqOptions['postData'];
+    }
+
+    var r = request(this.reqOptions, (error, response, body) => {
       if (error) {
         // this.fail helps for bugs WITH NO KNOWN FIX LIKE: routines:SSL3_GET_RECORD:wrong version number:
         return this.fail(10, "ERROR with advanced request code somehow!! Err:" + error);
