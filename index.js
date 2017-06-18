@@ -100,7 +100,7 @@ class AdvancedRequest {
   fail (sleepSeconds, additionalMsg) {
     this.numTriesSoFar++;
 
-    console.log("[!]", additionalMsg || 'Req fail!',
+    console.log("[!]", additionalMsg || 'AdvancedRequest.fail call -',
       "Status:", this.responseStatusCode, "url:", this.opts.url, "name:", this.name,
       "tries left:", this.maxRetries - this.numTriesSoFar, "options:", this.reqOptions);
 
@@ -111,11 +111,16 @@ class AdvancedRequest {
     setTimeout(this.run.bind(this), sleepSeconds*1000.0); // convert to full seconds here
   }
 
+  getLastRunHash () {
+    // Allow setting a lastRunHash on the class (probably subclass) or use the module one instead
+    return this.lastRunHash || lastRunHash;
+  }
+
   onFinish (result) {
     // Update last run time for this request if applicable. (in future add username?)
-    if (lastRunHash[this.name]) {
+    if (this.getLastRunHash()[this.name]) {
       // We use THIS moment, the END of the request as the marker.
-      lastRunHash[this.name].lastReqTime = new Date();
+      this.getLastRunHash()[this.name].lastReqTime = new Date();
     }
 
     return this.callback(result);
@@ -139,25 +144,25 @@ class AdvancedRequest {
 
   isSleepIntervalNecessary () {
     // If this is a request with limitations
-    if (lastRunHash[this.name]) {
+    if (this.getLastRunHash()[this.name]) {
       // initialize now if not initialized yet
-      if (!lastRunHash[this.name].lastReqTime) {
-        lastRunHash[this.name].lastReqTime = new Date();
+      if (!this.getLastRunHash()[this.name].lastReqTime) {
+        this.getLastRunHash()[this.name].lastReqTime = new Date();
       }
 
-      var millisecondsSinceLastRequest = (new Date() - lastRunHash[this.name].lastReqTime);
-      return millisecondsSinceLastRequest < lastRunHash[this.name].requiredInterval;
+      var millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
+      return millisecondsSinceLastRequest < this.getLastRunHash()[this.name].requiredInterval;
     }
     return false;
   }
 
   sleepIntervalIfNecessary (callback) {
     if (this.isSleepIntervalNecessary()) {
-      var millisecondsSinceLastRequest = (new Date() - lastRunHash[this.name].lastReqTime);
-      var timeToSleep = lastRunHash[this.name].requiredInterval - millisecondsSinceLastRequest;
+      var millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
+      var timeToSleep = this.getLastRunHash()[this.name].requiredInterval - millisecondsSinceLastRequest;
       console.log("[D] Sleeping", timeToSleep/(1000), "seconds now");
 
-      setTimeout(() => {this.sleepIntervalIfNecessary(callback);}, timeToSleep);
+      setTimeout(() => { this.sleepIntervalIfNecessary(callback); }, timeToSleep);
     } else {
       return callback();
     }
@@ -168,7 +173,7 @@ class AdvancedRequest {
    */
   run () {
     if (this.isSleepIntervalNecessary()) {
-      return this.sleepIntervalIfNecessary(() => {this.run.apply(this, arguments); });
+      return this.sleepIntervalIfNecessary(() => { this.run.apply(this, arguments); });
     }
 
     var extraOpts = {
@@ -232,5 +237,16 @@ module.exports = {
   AdvancedRequest: AdvancedRequest,
   setLastRunHash: function (newLastRunHash) {
     lastRunHash = newLastRunHash;
-  }
+  },
+  addToLastRunHash: function (items) {
+    // Merge options to pass on additional options to request
+    lastRunHash = Object.assign({}, lastRunHash, items);
+  },
+  removeFromLastRunHash: function (items) {
+    for (var i in items) {
+      if (i in lastRunHash) {
+        delete lastRunHash[i];
+      }
+    }
+  },
 };
