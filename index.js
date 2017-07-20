@@ -65,9 +65,12 @@ class AdvancedRequest {
 
     this.requestHeaders = {}; // nodejs request sent OUT
     this.responseHeaders = [];  // headers for the request RESPONSE
+    this.isRequestComplete = false;
+    this.markedToCancel = false;
   }
 
   /**
+   * addHeader
    * Provide the FULL header. ex:
    * addHeader('Cookie: awefaf=ewfef;wefweafwef');
    */
@@ -123,6 +126,7 @@ class AdvancedRequest {
       this.getLastRunHash()[this.name].lastReqTime = new Date();
     }
 
+    this.isRequestComplete = true;
     return this.callback(result);
   }
 
@@ -169,9 +173,28 @@ class AdvancedRequest {
   }
 
   /**
-   * Perform request
+   * cancelRequest
+   * Call at any point to cancel a request from being sent out or stop it from
+   * retrying if it is in the process of failing or sleeping.
+   * NOTE: The provided callback in the constructor will not be called if canceled.
+   */
+  cancelRequest () {
+    if (this.markedToCancel) {
+      return console.log("[D] AdvancedRequest - This request is already canceled!");
+    } else if (this.isRequestComplete) {
+      return console.log("[!] AdvancedRequest - Warning! Trying to cancel a request that already completed");
+    } else {
+      this.markedToCancel = true;
+    }
+  }
+
+  /**
+   * run
+   * Actually perform request
    */
   run () {
+    if (this.markedToCancel) return; // bail out right now
+
     if (this.isSleepIntervalNecessary()) {
       return this.sleepIntervalIfNecessary(() => { this.run.apply(this, arguments); });
     }
