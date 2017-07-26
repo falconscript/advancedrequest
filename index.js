@@ -90,8 +90,8 @@ class AdvancedRequest {
    * You may want to override this function as your needs demand
    */
   onRequestRetriesExhausted () {
-    console.log("[!] Max request retries exceeded for request named (", this.name, ")", ". Quitting process!");
-    require('process').exit(0);
+    console.log("[!] Max request retries exceeded for request named (", this.name, ")", ". Throwing exception!");
+    throw "ADVANCEDREQUEST_RETRIES_EXCEEDED";
   }
 
   /**
