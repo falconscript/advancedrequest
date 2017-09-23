@@ -101,4 +101,4 @@ sendFriendRequestTo(34, function(json) {
 ```
 
 ## Credits
-http://c-cfalcon.rhcloud.com
+http://x64projects.tk/
