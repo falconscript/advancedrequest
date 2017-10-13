@@ -76,7 +76,8 @@ class AdvancedRequest {
    */
   addHeader (fullHeader) {
     var pieces = fullHeader.split(': ');
-    this.requestHeaders[pieces[0]] = pieces[1]; // Could do .toLowerCase() on pieces[0]
+    // .pop to pull off the first instance of ': ' because ': ' could occur later in the header
+    this.requestHeaders[pieces.shift()] = pieces.join(': '); // Could do .toLowerCase() on pieces.shift()
   }
 
   getResponseHeaders () {
