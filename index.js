@@ -250,7 +250,7 @@ class AdvancedRequest {
 
     // Quickly attach pipe call before tick ends. Next tick will be request call!
     if (this.saveAs) {
-      requ.pipe(fs.createWriteStream(this.saveAs));
+      r.pipe(fs.createWriteStream(this.saveAs));
     }
   }
 };
