@@ -24,20 +24,22 @@ to make sure script restarts don't accidentally disobey the interval
 
 ## Simple GET request example
 ```js
-var advancedrequest = require('advancedrequest');
+let advancedrequest = require('advancedrequest');
 
-new advancedrequest.AdvancedRequest({
-    url: "http://api.somefriendsite.com/addFriend",
-    callback: function (dataString) {
-      console.log("[+] API response received!", dataString);
-    }
-}).run();
+let requestData = await new advancedrequest.AdvancedRequest({
+  url: "http://api.somefriendsite.com/addFriend"
+}).runAsync();
+
+console.log("[+] API response received!", requestData);
 ```
 
 ## Inheritance example
 
 Here you can define our own logic to determine if a request was successful  
-or needs to be retried by subclassing advancedrequest.AdvancedRequest
+or needs to be retried by subclassing advancedrequest.AdvancedRequest  
+Calling this.fail(timeoutInMs, messageToLog); will retry the request up to  
+10 times. This max can be passed in as an integer argument named maxRetries.  
+Call this.onFinish(this.data); in order to complete the request
 ```js
 class DevApiRequest extends advancedrequest.AdvancedRequest {
   constructor (args) {
@@ -62,17 +64,17 @@ class DevApiRequest extends advancedrequest.AdvancedRequest {
 
 // Then once you've written your DevApiRequest class, maybe you'd call it so:
 function sendFriendRequestTo(targetId, callback) {
-
-  var sendFriendRequestReq = new DevApiRequest({
+  let sendFriendRequestReq = new DevApiRequest({
       url: "http://api.somefriendsite.com/addFriend",
       method: "POST",
       name: "sendFriendRequest", // NOTE: used as identifier for interval
       postData: { targetId: targetId, auth_token: "24t4534token42i5h2"},
       callback: callback
   });
-  sendFriendRequestReq.run();
 
+  sendFriendRequestReq.runAsync().then(callback);
 }
+
 sendFriendRequestTo(252452, function(json) {
   console.log("[+] API response received!", json);
 });

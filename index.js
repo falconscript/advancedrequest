@@ -1,5 +1,5 @@
 
-var request = require('request'); // https://github.com/request/request
+const request = require('request'); // https://github.com/request/request
 
 /**
  * @class AdvancedRequest
@@ -55,7 +55,7 @@ class AdvancedRequest {
     this.isBinaryRequest = args.isBinaryRequest || this.saveAs;
 
     this.callback = args.callback || function () {
-        console.log("[!] No request callback provided!");
+      console.log(`[!] No request callback provided! req name: ${this.name}`);
     };
 
     this.numTriesSoFar = 0; // start at zero
@@ -75,7 +75,7 @@ class AdvancedRequest {
    * addHeader('Cookie: awefaf=ewfef;wefweafwef');
    */
   addHeader (fullHeader) {
-    var pieces = fullHeader.split(': ');
+    let pieces = fullHeader.split(': ');
     // .pop to pull off the first instance of ': ' because ': ' could occur later in the header
     this.requestHeaders[pieces.shift()] = pieces.join(': '); // Could do .toLowerCase() on pieces.shift()
   }
@@ -91,7 +91,7 @@ class AdvancedRequest {
    * You may want to override this function as your needs demand
    */
   onRequestRetriesExhausted () {
-    console.log("[!] Max request retries exceeded for request named (", this.name, ")", ". Throwing exception!");
+    console.log(`[!] Max request retries exceeded for request named (${this.name}). Throwing exception!`);
     throw "ADVANCEDREQUEST_RETRIES_EXCEEDED";
   }
 
@@ -109,7 +109,7 @@ class AdvancedRequest {
       "tries left:", this.maxRetries - this.numTriesSoFar, "options:", this.reqOptions);
 
     if (this.numTriesSoFar >= this.maxRetries && this.maxRetries != 0) {
-        return this.onRequestRetriesExhausted();
+      return this.onRequestRetriesExhausted();
     }
 
     setTimeout(this.run.bind(this), sleepSeconds*1000.0); // convert to full seconds here
@@ -155,7 +155,7 @@ class AdvancedRequest {
         this.getLastRunHash()[this.name].lastReqTime = new Date();
       }
 
-      var millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
+      let millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
       return millisecondsSinceLastRequest < this.getLastRunHash()[this.name].requiredInterval;
     }
     return false;
@@ -163,8 +163,8 @@ class AdvancedRequest {
 
   sleepIntervalIfNecessary (callback) {
     if (this.isSleepIntervalNecessary()) {
-      var millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
-      var timeToSleep = this.getLastRunHash()[this.name].requiredInterval - millisecondsSinceLastRequest;
+      let millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
+      let timeToSleep = this.getLastRunHash()[this.name].requiredInterval - millisecondsSinceLastRequest;
       console.log("[D] Sleeping", timeToSleep/(1000), "seconds now");
 
       setTimeout(() => { this.sleepIntervalIfNecessary(callback); }, timeToSleep);
@@ -190,8 +190,22 @@ class AdvancedRequest {
   }
 
   /**
+   * run - but compatible with async/await. Both run and runAsync are actually asynchronous
+   * Can be used like so: 
+   * let requestData = await new AdvancedRequest({...}).runAsync()
+   */
+  async runAsync () {
+    // this promise will return the request data,
+    return await new Promise((resolve, reject) => {
+      this.callback = resolve; // change callback to resolve, called at end of request, in onFinish
+      return this.run(); // fire off request
+    });
+  }
+
+  /**
    * run
-   * Actually perform request
+   * Actually perform request.
+   * DEPRECATED style to fire request, though will be left in for backwards compatibility
    */
   run () {
     if (this.markedToCancel) return; // bail out right now
@@ -200,7 +214,7 @@ class AdvancedRequest {
       return this.sleepIntervalIfNecessary(() => { this.run.apply(this, arguments); });
     }
 
-    var extraOpts = {
+    let extraOpts = {
       headers: this.requestHeaders,
       gzip: true,
       timeout: 60*1000, // number of ms to wait for response headers (1 min)
@@ -234,7 +248,7 @@ class AdvancedRequest {
       delete this.reqOptions['postData'];
     }
 
-    var r = request(this.reqOptions, (error, response, body) => {
+    let r = request(this.reqOptions, (error, response, body) => {
       if (error) {
         // this.fail helps for bugs WITH NO KNOWN FIX LIKE: routines:SSL3_GET_RECORD:wrong version number:
         return this.fail(10, "ERROR with advanced request code somehow!! Err:" + error);
@@ -267,7 +281,7 @@ module.exports = {
     lastRunHash = Object.assign({}, lastRunHash, items);
   },
   removeFromLastRunHash: function (items) {
-    for (var i in items) {
+    for (let i in items) {
       if (i in lastRunHash) {
         delete lastRunHash[i];
       }
