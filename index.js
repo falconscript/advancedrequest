@@ -29,9 +29,9 @@ const request = require('request'); // https://github.com/request/request
  * to make sure script restarts don't accidentally disobey the interval
  *
  */
-var lastRunHash = {
-    //'WebAPIfollowCMD': { lastReqTime: new Date(), requiredInterval: 1000*10 }, // 10 seconds
-    //'WebAPIunfollowCMD': { lastReqTime: new Date(), requiredInterval: 1000*60*10 }, // 10 minutes
+let lastRunHash = {
+  //'WebAPIfollowCMD': { lastReqTime: new Date().getTime(), requiredInterval: 1000*10 }, // 10 seconds
+  //'WebAPIunfollowCMD': { lastReqTime: new Date().getTime(), requiredInterval: 1000*60*10 }, // 10 minutes
 };
 
 class AdvancedRequest {
@@ -112,7 +112,7 @@ class AdvancedRequest {
       return this.onRequestRetriesExhausted();
     }
 
-    setTimeout(this.run.bind(this), sleepSeconds*1000.0); // convert to full seconds here
+    setTimeout(this.run.bind(this), sleepSeconds * 1000); // convert to full seconds here
   }
 
   getLastRunHash () {
@@ -124,7 +124,7 @@ class AdvancedRequest {
     // Update last run time for this request if applicable. (in future add username?)
     if (this.getLastRunHash()[this.name]) {
       // We use THIS moment, the END of the request as the marker.
-      this.getLastRunHash()[this.name].lastReqTime = new Date();
+      this.getLastRunHash()[this.name].lastReqTime = new Date().getTime();
     }
 
     this.isRequestComplete = true;
@@ -150,22 +150,25 @@ class AdvancedRequest {
   isSleepIntervalNecessary () {
     // If this is a request with limitations
     if (this.getLastRunHash()[this.name]) {
+      let now = new Date().getTime();
+
       // initialize now if not initialized yet
       if (!this.getLastRunHash()[this.name].lastReqTime) {
-        this.getLastRunHash()[this.name].lastReqTime = new Date();
+        this.getLastRunHash()[this.name].lastReqTime = now;
       }
 
-      let millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
+      let millisecondsSinceLastRequest = (now - this.getLastRunHash()[this.name].lastReqTime);
       return millisecondsSinceLastRequest < this.getLastRunHash()[this.name].requiredInterval;
     }
+
     return false;
   }
 
   sleepIntervalIfNecessary (callback) {
     if (this.isSleepIntervalNecessary()) {
-      let millisecondsSinceLastRequest = (new Date() - this.getLastRunHash()[this.name].lastReqTime);
+      let millisecondsSinceLastRequest = (new Date().getTime() - this.getLastRunHash()[this.name].lastReqTime);
       let timeToSleep = this.getLastRunHash()[this.name].requiredInterval - millisecondsSinceLastRequest;
-      console.log("[D] Sleeping", timeToSleep/(1000), "seconds now");
+      console.log(`[D] AdvancedRequest.${this.name} - Sleeping ${timeToSleep/(1000)} seconds now`);
 
       setTimeout(() => { this.sleepIntervalIfNecessary(callback); }, timeToSleep);
     } else {
@@ -185,6 +188,8 @@ class AdvancedRequest {
     } else if (this.isRequestComplete) {
       return console.log("[!] AdvancedRequest - Warning! Trying to cancel a request that already completed");
     } else {
+      this.reqObj && this.reqObj.abort && this.reqObj.abort(); // abort request if in progress
+      clearTimeout(this._requestTimeoutInt);
       this.markedToCancel = true;
     }
   }
@@ -208,7 +213,7 @@ class AdvancedRequest {
    * DEPRECATED style to fire request, though will be left in for backwards compatibility
    */
   run () {
-    if (this.markedToCancel) return; // bail out right now
+    if (this.markedToCancel) return console.log(`[D] ${this.name} - Request canceled.`); // bail out right now
 
     if (this.isSleepIntervalNecessary()) {
       return this.sleepIntervalIfNecessary(() => { this.run.apply(this, arguments); });
@@ -217,7 +222,7 @@ class AdvancedRequest {
     let extraOpts = {
       headers: this.requestHeaders,
       gzip: true,
-      timeout: 60*1000, // number of ms to wait for response headers (1 min)
+      timeout: 60 * 1000, // number of ms to wait for response headers (1 min)
 
       // https://github.com/nodejs/node/issues/3692 UGGHHHH this bug results in
       //  a call to this.fail(10) then next request works
@@ -229,6 +234,7 @@ class AdvancedRequest {
     if (this.isBinaryRequest) {
       extraOpts["encoding"] = null; // set to null to get binary and not string
     }
+
     if (this.opts.postData) {
       if (this.noMultipartHeader) {
         extraOpts["form"] = this.opts.postData;
@@ -248,10 +254,18 @@ class AdvancedRequest {
       delete this.reqOptions['postData'];
     }
 
-    let r = request(this.reqOptions, (error, response, body) => {
+    // Set a protection timeout because node's request module SOMETIMES doesn't timeout properly. (v2.88.0 at least)
+    this._requestTimeoutInt = setTimeout(() => {
+      this.reqObj.abort();
+      this.fail(.1, `[!] ${this.name || "AdvancedRequest"} - Timeout for request (within request module). Retrying.`);
+    }, extraOpts.timeout + 2000); // 2 seconds above established timeout
+
+    this.reqObj = request(this.reqOptions, (error, response, body) => {
+      clearTimeout(this._requestTimeoutInt);
+
       if (error) {
         // this.fail helps for bugs WITH NO KNOWN FIX LIKE: routines:SSL3_GET_RECORD:wrong version number:
-        return this.fail(10, "ERROR with advanced request code somehow!! Err:" + error);
+        return this.fail(10, `${this.name} - ERROR with advanced request code somehow!! Err: ${error}`);
       } else {
         // body will be Buffer if isBinaryRequest or string otherwise
         this.data = body;
@@ -264,7 +278,7 @@ class AdvancedRequest {
 
     // Quickly attach pipe call before tick ends. Next tick will be request call!
     if (this.saveAs) {
-      r.pipe(fs.createWriteStream(this.saveAs));
+      this.reqObj.pipe(fs.createWriteStream(this.saveAs));
     }
   }
 };

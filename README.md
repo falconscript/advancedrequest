@@ -88,7 +88,7 @@ Using the DevApiRequest class, we first set lastRunHash with the proper interval
 // Set interval timeouts for the requests of a particular name
 advancedrequest.setLastRunHash({
   'sendFriendRequest': { requiredInterval: 1000*15 }, // 15 seconds
-  'removeFriend':      { requiredInterval: 1000*5, lastReqTime: new Date() }
+  'removeFriend':      { requiredInterval: 1000*5, lastReqTime: new Date().getTime() }
 });
 
 sendFriendRequestTo(34, function(json) {
