@@ -1,3 +1,4 @@
+"use strict";
 
 const request = require('request'); // https://github.com/request/request
 
@@ -34,14 +35,32 @@ let lastRunHash = {
   //'WebAPIunfollowCMD': { lastReqTime: new Date().getTime(), requiredInterval: 1000*60*10 }, // 10 minutes
 };
 
+let lastWarningTimestamps = {
+  "postDataWarning": 0,
+};
+
 class AdvancedRequest {
   constructor (args) {
     this.opts = args;
     this.opts.method = args.method || "GET";
 
-    // stringify if necessary
-    if (typeof(this.opts.postData) == "object") {
-      this.opts.postData = JSON.stringify(this.opts.postData);
+    if (!this.opts.noWarnings && this.opts.postData && typeof(this.opts.postData) === "string") {
+      // Give warning at most once per 5 minutes
+      let now = new Date().getTime();
+      let msSinceLastWarning = now - lastWarningTimestamps["postDataWarning"];
+
+      if (!lastWarningTimestamps["postDataWarning"] || msSinceLastWarning > 1000*60*5) {
+        lastWarningTimestamps["postDataWarning"] = now;
+        console.error(
+          "[!] AdvancedRequest: WARNING! It is recommended to pass 'postData' as an object.\n" +
+          "[!] It was passed as a string, not advised. Instead, pass as object and use 'Content-Type' header to change its format.\n" +
+          "[!] Instead, set the Content-Type header as so to let this module stringify it to the proper format/type:\n" +
+          ' - For Form data (ex: param1=val1&param2=val2 )        Use: req.addHeader("Content-Type: application/x-www-form-urlencoded")\n' +
+          ' - For JSON data (ex: {"param1": "val1", "val2": 1} )  Use: req.addHeader("Content-Type: application/json; charset=utf-8")\n' +
+          " - For file uploads, use multipart/form-data.\n" +
+          '(This message will only show up once every 5 minutes. Silence it with option "noWarnings": true for request)'
+        );
+      }
     }
 
     this.name = args.name || "unnamed request";
@@ -213,7 +232,7 @@ class AdvancedRequest {
    * DEPRECATED style to fire request, though will be left in for backwards compatibility
    */
   run () {
-    if (this.markedToCancel) return console.log(`[D] ${this.name} - Request canceled.`); // bail out right now
+    if (this.markedToCancel) return console.log(`[D] ${this.name} - Request was canceled. Not running.`); // bail out right now
 
     if (this.isSleepIntervalNecessary()) {
       return this.sleepIntervalIfNecessary(() => { this.run.apply(this, arguments); });
@@ -236,20 +255,19 @@ class AdvancedRequest {
     }
 
     if (this.opts.postData) {
-      if (this.noMultipartHeader) {
+      if (this.noMultipartHeader) { // always prefer to send through multipart by default
+        //'Content-Type': 'application/x-www-form-urlencoded', or 'Content-Type': 'application/json; charset=utf-8'
         extraOpts["form"] = this.opts.postData;
       } else {
-        extraOpts["multipart"] = [ {
-          //'Content-Type': 'application/x-www-form-urlencoded',
-          body: (typeof(this.opts.postData) == "string") ? this.opts.postData : JSON.stringify(this.opts.postData),
-        } ];
+        // 'Content-Type': 'multipart/form-data' // can truncate file if boundary is in file...
+        extraOpts["formData"] = this.opts.postData; //body: (typeof(this.opts.postData) == "string") ? this.opts.postData : JSON.stringify(this.opts.postData),
       }
     }
 
     // Merge options to pass on additional options to request
-    this.reqOptions = Object.assign({}, this.opts, extraOpts);
+    this.reqOptions = Object.assign({}, extraOpts, this.opts); // opts last to allow user to always override extraOpts's defaults
 
-    // We're using 'form' or 'multipart' not the 'postData' key
+    // We're using 'form' or 'multipart' not the 'postData' key, just was for our interface
     if ('postData' in this.reqOptions) {
       delete this.reqOptions['postData'];
     }
@@ -258,7 +276,7 @@ class AdvancedRequest {
     this._requestTimeoutInt = setTimeout(() => {
       this.reqObj.abort();
       this.fail(.1, `[!] ${this.name || "AdvancedRequest"} - Timeout for request (within request module). Retrying.`);
-    }, extraOpts.timeout + 2000); // 2 seconds above established timeout
+    }, this.reqOptions.timeout + 2000); // 2 seconds above established timeout
 
     this.reqObj = request(this.reqOptions, (error, response, body) => {
       clearTimeout(this._requestTimeoutInt);

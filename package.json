@@ -1,12 +1,24 @@
 {
   "name": "advancedrequest",
   "private": false,
-  "version": "1.0.15",
+  "version": "2.0.1",
   "description": "ES6 JS class for intervaled requests with retries and timeouts",
-  "keywords": ["advancedrequest", "advanced request", "http", "request",
-      "interval", "interval request", "api", "developer api", "rate", "limit", "rate limit", "rate limiting" ],
+  "keywords": [
+    "advancedrequest",
+    "advanced request",
+    "http",
+    "request",
+    "interval",
+    "interval request",
+    "api",
+    "developer api",
+    "rate",
+    "limit",
+    "rate limit",
+    "rate limiting"
+  ],
   "dependencies": {
-    "request": "2.87.0"
+    "request": "^2.88.2"
   },
   "repository": {
     "type": "git",
