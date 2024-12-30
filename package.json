@@ -1,7 +1,7 @@
 {
   "name": "advancedrequest",
   "private": false,
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "ES6 JS class for intervaled requests with retries and timeouts",
   "keywords": [
     "advancedrequest",

@@ -44,7 +44,11 @@ class AdvancedRequest {
     this.opts = args;
     this.opts.method = args.method || "GET";
 
-    if (!this.opts.noWarnings && this.opts.postData && typeof(this.opts.postData) === "string") {
+    // stringify if necessary
+    if (typeof(this.opts.postData) == "object") {
+      this.opts.postData = JSON.stringify(this.opts.postData);
+    }
+    if (!this.opts.noWarnings && this.opts.postData) {
       // Give warning at most once per 5 minutes
       let now = new Date().getTime();
       let msSinceLastWarning = now - lastWarningTimestamps["postDataWarning"];
@@ -52,12 +56,17 @@ class AdvancedRequest {
       if (!lastWarningTimestamps["postDataWarning"] || msSinceLastWarning > 1000*60*5) {
         lastWarningTimestamps["postDataWarning"] = now;
         console.error(
-          "[!] AdvancedRequest: WARNING! It is recommended to pass 'postData' as an object.\n" +
-          "[!] It was passed as a string, not advised. Instead, pass as object and use 'Content-Type' header to change its format.\n" +
-          "[!] Instead, set the Content-Type header as so to let this module stringify it to the proper format/type:\n" +
-          ' - For Form data (ex: param1=val1&param2=val2 )        Use: req.addHeader("Content-Type: application/x-www-form-urlencoded")\n' +
-          ' - For JSON data (ex: {"param1": "val1", "val2": 1} )  Use: req.addHeader("Content-Type: application/json; charset=utf-8")\n' +
-          " - For file uploads, use multipart/form-data.\n" +
+          "[!] AdvancedRequest: WARNING! The 'postData' key has been DEPRECATED. \n" +
+          "[!] Though it will continue to work as before, the underlying module 'request' has problems with it.\n" +
+          "[!] PLEASE migrate and use a different key. Here is the explanation on how to switch:\n" +
+          ' - For Form data (ex: param1=val1&param2=val2 )\n' +
+          '   Change "postData" to "form". Optionally can specify the matching header: req.addHeader("Content-Type: application/x-www-form-urlencoded")\n\n' +
+
+          ' - For JSON data (ex: {"param1": "val1", "param2": 2} )\n' +
+          '   Change "postData" to "json". Optionally can specify the matching header: req.addHeader("Content-Type: application/json; charset=utf-8")\n\n' +
+
+          ' - For file uploads (and some standard form data ex: param1=val1&param2=val2 )\n' +
+          '   Change "postData" to "formData", Optionally can specify the matching header: req.addHeader("Content-Type: multipart/form-data")\n\n' +
           '(This message will only show up once every 5 minutes. Silence it with option "noWarnings": true for request)'
         );
       }
@@ -255,12 +264,20 @@ class AdvancedRequest {
     }
 
     if (this.opts.postData) {
-      if (this.noMultipartHeader) { // always prefer to send through multipart by default
-        //'Content-Type': 'application/x-www-form-urlencoded', or 'Content-Type': 'application/json; charset=utf-8'
+      if (this.noMultipartHeader) {
+        // 'Content-Type': 'application/x-www-form-urlencoded',
         extraOpts["form"] = this.opts.postData;
       } else {
-        // 'Content-Type': 'multipart/form-data' // can truncate file if boundary is in file...
-        extraOpts["formData"] = this.opts.postData; //body: (typeof(this.opts.postData) == "string") ? this.opts.postData : JSON.stringify(this.opts.postData),
+        // can be multiple sections of different Content-Types... 'Content-Type': 'multipart/related'
+        extraOpts["multipart"] = [ {
+          body: (typeof(this.opts.postData) == "string") ? this.opts.postData : JSON.stringify(this.opts.postData),
+        } ];
+
+        // (For Multipart Form Uploads) 'Content-Type': 'multipart/form-data'
+        // extraOpts["formData"] = this.opts.postData; // for file uploads
+
+        // (For JSON string/objects) 'Content-Type': 'application/json; charset=utf-8' ,
+        // extraOpts["json"] = this.opts.postData; // could also do JSON.parse test to see if valid json?
       }
     }
 
